@@ -1,0 +1,163 @@
+Stumbleupon contest
+========================================================
+Build a classifier to categorize webpages as evergreen or non-evergreen
+----------
+You start by building a dictionary of words (or n-grams) across your documents. These are your features (Y). Then for each document (X), you compute the TF-IDF score of the document for each word in your dictionary (it will be 0 most of the time since only a small fraction of the dictionary appears in a given document --your document vector will be sparse).
+
+Then you have a (sparse) matrix of X documents vectors by Y word features, which you can feed into any classifier. 
+
+Note that a huge sparse matrix can be impractical for some classifiers. In that case you can do a PCA on your sparse matrix first, to reduce it to ~500 features (instead of 50k+). The TF-IDF+PCA combination is called LSA (Latent Semantic Analysis) and is the most basic and universal technique in semantic analysis. Each eigenvector in your PCA is a "topic" in your document set.
+*************************
+"glmnet is fast because it uses a quadratic approximation to the log-likelihood when fitting. for the same reason its performance is sub-optimal"
+***********************
+By pre-processing the data you can improve the leaderboard score of beat_bench.py to ~AUC 0.880.
+
+This pre-processing code uses NLTK and increases execution time of beat_bench.py by a few minutes.
+
+One can quickly clean text, tokenize, do stemming/lemmatization, remove stopwords.
+
+Stemming/lemmatization increases leaderboard score of beat_bench.py. Though more aggressive stemmers like PorterStemmer, SnowballStemmer and LancasterStemmer give a higher 20 fold CV score, the less aggressive WordNetLemmatizer gives a modest CV score increase, but the highest leaderboard score of ~AUC 0.880.
+
+Removing stopwords does not increase this benchmark's leaderboard score for me.
+
+Updating beat_bench.py
+
+Add this to imports:
+
+from preprocessing import preprocess_pipeline
+
+Change and add following:
+
+print "loading data.."
+traindata_raw = list(np.array(p.read_table('../data/train.tsv'))[:,2])
+testdata_raw = list(np.array(p.read_table('../data/test.tsv'))[:,2])
+y = np.array(p.read_table('../data/train.tsv'))[:,-1]
+
+print "pre-processing data"
+traindata = []
+testdata = []
+for observation in traindata_raw:
+  traindata.append(preprocess_pipeline(observation, "english", "WordNetLemmatizer", True, False, False))
+for observation in testdata_raw:
+  testdata.append(preprocess_pipeline(observation, "english", "WordNetLemmatizer", True, False, False))
+********************************
+I haven't done any feature extraction. My CV scores are spot on. There are better things you can do with the text - I've only used Train data so far but I will be running your code so will have some test features too. Also, if you do the text analysis properly, recipes aren't a problem ;)
+HINT: Most recipe words are neutral - do they need to be included?
+***************
+Anyone improved his/her score by employing TruncatedSVD?
+  Dimensionality reduction using truncated SVD (aka LSA). This transformer performs linear   dimensionality reduction by means of truncated singular value decomposition (SVD). It is very similar to PCA, but operates on sample vectors directly, instead of on a covariance matrix. This means it can work with scipy.sparse matrices efficiently. In particular, truncated SVD works on term count/tf–idf matrices as returned by the vectorizers in sklearn.feature_extraction.text. In that context, it is known as latent semantic analysis (LSA).
+
+Anyone improved his/her score by employing SelectKBest?
+  Select features according to the k highest scores.
+****
+I tried LSA with no improvements in my CV or the leaderboard, using the SelectKBest and SelectPercentile I just get better CV scores, but didn't boost my Leaderboard scores, wich can indicate overfit.
+****************
+TruncatedSVD: the result is worse than without it (both CV and leaderboard).
+
+SelectKBest: it tends to overfit badly, and in CV feature selection loop I didn't see any improvements... 
+***************
+try a chi2 feature selection with 90 percentile features
+******************
+I tried incorporating latent dirichlet allocation to no gain
+************
+I tried LDA with various number of topics and I appended the results on my termDocumentMatrix. It did improve my leaderboard score but not my CV score.
+**********
+I carried a text analysis on the positives 1s and a separate text analysis for the 0s. I then merged them together, calclulated z-scores and removed the words with Z-scores of around 0. Didn't really improve the score much (I think you get the "Random Factor" using all words) but it does mean I could run RF and other memory hungry algorithms
+EDIT: I wrote my own analyser in Perl to carry this out
+************
+There are dangers to trying to identify the "best" features based on the training set, due to its relatively small size (some words can be very discriminative in the training set, in a way that doesn't generalize in the test data).
+
+Doing a PCA on the training + test set might be a better way to reduce and de-noise your feature space.
+*********************
+how did you combine text features with numerical features?
+----
+I'm using scikit-learn, so the text features are scipy CSR sparse matrices from either CountVectorizer, TfidfVectorizer, or HashingVectorizer. Combining them with the other features would be something like:
+
+from scipy import sparse
+new_features = sparse.hstack((text_features, other_features)).tocsr()
+***********
+Oh wow, thanks guys.  So helpful to have some idea of how to combine the sparse matrix from the sci-kit learn vectorized text with other features.  I was using the output prediction of the bayes+vectorized text as another feature in a model with the other non-text features.  Great results in CV; poop on the leaderboard.
+*********************
+I just started going down the tree-based route after getting all the mileage I can out of logistic regression (I think).  I know no one is going to give me anything definite, but what are some of your thoughts on the Latent Semantic Analysis route (dense (words x n) matrix created by n iterations of SVD).  
+
+The benefit is a set of continuous variables produced from a sparse representation of hard integer counts (assuming you use CountVectorizer() to process the text) which are more appealing to input into tree-based models.  The problem is 2 fold: 1) due to the sparsity, you can't gauge the % of variance explained for each linear projection (I think... since sparse matrices wont let you compute the mean w/o becoming dense).  2) you're still subject to memory constraints... even if you could CV to find the appropriate amount of n iterations for SVD, you might not be able to store it.
+
+I don't know, just rambling.  I don't really see how else you could feed this stuff into a tree.  Tuning m_try and max_depth on a 100k+ feature set seems ridiculous :)
+*****************************************
+```{r}
+train <- read.table('data/train.tsv',sep='\t',header=T,stringsAsFactors=F,na.strings = "?")
+train$alchemy_category <- as.factor(train$alchemy_category)
+train$url <- as.factor(train$url)
+train0 <- train[,-3]
+train_bp <- train[,3]
+train_bp_1 <- train_bp[1]
+```
+libs
+---
+```{r}
+library(psych)
+library(gclus)
+library(rgl)
+```
+plot vs labal
+----
+```{r}
+plot(label~.,train0[,-1])
+```
+cor
+----
+```{r}
+describe(train0)
+describeBy(train0[-1],train0$label)
+round(cor(train0[4:26]),2)
+```
+Color scatterplot matrix, colored and ordered by magnitude of r
+```{r}
+base <- train0[21:26]
+base.r <- abs(cor(base))
+base.color <- dmat.color(base.r)
+base.order <- order.single(base.r) 
+cpairs(base, base.order, panel.colors = base.color, gap = .5,
+       main = "Variables Ordered and Colored by Correlation")
+
+```
+plot3d
+---
+```{r}
+plot3d(train0$frameTagRatio, train0$commonlinkratio_3 , train0$linkwordscore, col=(train0$label+1) )
+```
+pca
+==
+```{r}
+library(caret)
+ta=train0[,3:25]
+ta=sapply(ta,as.numeric)
+ta=ta[,-c(10,15)]
+y=train0[,26]
+preProcValues <- preProcess(ta, method = c("scale","pca"),pcaComp=3)
+tat <- predict(preProcValues,ta)
+d=10
+#plot(tat,col=y+1,pch=19,xlim=c(-d,d),ylim=c(-d,d),cex=0.5)
+plot3d(tat,size=5,col=y+1)
+```
+Models
+--
+```{r}
+
+models = read.table('code/models.txt',header=T) ;View(models)
+```
+residuals
+----
+```{r}
+ypred = read.csv('data/ypred.csv')
+train1 = train0
+train1$resid = ypred$resid
+par.mfrow=c(1,1)
+#plot(resid~.,train1[-1],pch=19,cex=0.3)
+y = ypred$ypred+ypred$resid
+yp=ypred$ypred
+yp[ypred$ypred>=0.5]=1
+yp[ypred$ypred<0.5]=0
+r = y-yp
+smoothScatter(ypred$ypred,r)
+```

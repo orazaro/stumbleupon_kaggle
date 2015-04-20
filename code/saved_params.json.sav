@@ -1,0 +1,46 @@
+{
+    "Model16": {
+        "C": 3,
+        "alpha": 0.7,
+        "binarize": 0.1,
+        "binary": true,
+        "fit_area": "all",
+        "max_df": 0.4,
+        "max_features": 300000,
+        "min_df": 5,
+        "n_components": 32,
+        "ngram_max": 1,
+        "preproc": 0,
+        "stemmer": 0,
+        "tfidf": 0,
+        "use_svd": true
+    },
+    "Model21": {
+        "alpha": 0.9,
+        "fit_area": "test",
+        "min_df": 1,
+        "preproc": 1,
+        "stemmer": 1,
+        "tfidf": 2,
+        "use_svd": false
+    },
+    "Model22": {
+        "alpha": 0.7,
+        "binarize": 0.1,
+        "binary": false,
+        "fit_area": "test",
+        "max_df": 0.5,
+        "max_features": 600000,
+        "min_df": 5,
+        "n_components": 32,
+        "ngram_max": 1,
+        "preproc": 0,
+        "stemmer": 1,
+        "tfidf": 0,
+        "use_svd": false
+    },
+    "_best_scores": {
+        "Model16": 0.87163848631239405,
+        "Model22": 0.856672019104079
+    }
+}
